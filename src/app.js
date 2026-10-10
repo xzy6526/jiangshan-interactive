@@ -34,6 +34,8 @@ const chapters = {
 const byId = id => document.getElementById(id);
 const gallery = byId('gallery');
 const landscape = byId('landscape');
+const painting = landscape.querySelector('img');
+const paintingSource = painting.getAttribute('src');
 const panInput = byId('pan-position');
 const minimapWindow = byId('minimap-window');
 const hero = byId('hero-copy');
@@ -59,12 +61,19 @@ let activeChapter = 'origin';
 let speechState = 'idle';
 let speechEpoch = 0;
 let utterance = null;
+let paintingReady = false;
+let paintingRequest = 0;
+let pageScroll = 0;
 
 function renderPan() {
   const overflow = Math.max(0, landscape.offsetWidth - gallery.clientWidth);
   landscape.style.transform = `translate3d(${-currentPosition * overflow}px, 0, 0)`;
   hotspots.forEach(hotspot => {
-    hotspot.classList.toggle('label-left', hotspot.offsetLeft - currentPosition * overflow > gallery.clientWidth - 225);
+    const screenX = hotspot.offsetLeft - currentPosition * overflow;
+    hotspot.classList.toggle('is-offscreen', screenX < 24 || screenX > gallery.clientWidth - 24);
+    const labelWidth = hotspot.querySelector('.hotspot-label').offsetWidth;
+    hotspot.classList.toggle('label-left', screenX + 30 + labelWidth > gallery.clientWidth - 12 && screenX - 30 - labelWidth >= 12);
+    hotspot.classList.toggle('preview-left', screenX + 220 > gallery.clientWidth - 12);
   });
   const ratio = Math.min(1, gallery.clientWidth / landscape.offsetWidth);
   minimapWindow.style.width = `${ratio * 100}%`;
@@ -72,8 +81,8 @@ function renderPan() {
   panInput.value = String(currentPosition * 100);
   panInput.setAttribute('aria-valuetext', `画卷位置 ${Math.round(currentPosition * 100)}%`);
   byId('position-label').textContent = `卷中位置 ${Math.round(currentPosition * 100)}%`;
-  byId('pan-left').disabled = currentPosition < .001;
-  byId('pan-right').disabled = currentPosition > .999;
+  byId('pan-left').disabled = !paintingReady || currentPosition < .001;
+  byId('pan-right').disabled = !paintingReady || currentPosition > .999;
 }
 
 function animate(time) {
@@ -113,6 +122,7 @@ function stopPan() {
 }
 
 function setAutomatic(enabled) {
+  if (enabled && !paintingReady) return;
   automatic = enabled;
   tourButton.setAttribute('aria-pressed', String(enabled));
   tourButton.querySelector('span').textContent = enabled ? '暂停游览' : '自动游览';
@@ -122,6 +132,7 @@ function setAutomatic(enabled) {
 }
 
 function setExploring(enabled) {
+  if (enabled && !paintingReady) return;
   gallery.classList.toggle('is-exploring', enabled);
   hero.inert = enabled;
   hero.setAttribute('aria-hidden', String(enabled));
@@ -129,7 +140,7 @@ function setExploring(enabled) {
 }
 
 gallery.addEventListener('pointermove', event => {
-  if (dialog.open) return;
+  if (dialog.open || !paintingReady) return;
   if (drag && drag.id === event.pointerId) {
     const distance = event.clientX - drag.x;
     if (!drag.moved) {
@@ -154,7 +165,7 @@ gallery.addEventListener('pointermove', event => {
 });
 
 gallery.addEventListener('pointerdown', event => {
-  if (event.pointerType === 'mouse' || !event.isPrimary || (event.target.closest('button') && !event.target.closest('.hotspot'))) return;
+  if (!paintingReady || event.pointerType === 'mouse' || !event.isPrimary || (event.target.closest('button') && !event.target.closest('.hotspot'))) return;
   setAutomatic(false);
   drag = { id: event.pointerId, x: event.clientX, y: event.clientY, position: currentPosition, moved: false,
     overflow: Math.max(1, landscape.offsetWidth - gallery.clientWidth), samples: [{ x: event.clientX, time: event.timeStamp }] };
@@ -183,7 +194,7 @@ gallery.addEventListener('click', event => {
 }, true);
 
 gallery.addEventListener('keydown', event => {
-  if (event.target !== gallery) return;
+  if (event.target !== gallery || !paintingReady) return;
   const positions = { ArrowLeft: targetPosition - .08, ArrowRight: targetPosition + .08, Home: 0, End: 1 };
   if (!(event.key in positions)) return;
   event.preventDefault(); setAutomatic(false); requestPan(positions[event.key]);
@@ -212,8 +223,44 @@ hotspots.forEach(hotspot => {
   });
   hotspot.addEventListener('click', () => openStory(hotspot.dataset.chapter));
 });
-new ResizeObserver(renderPan).observe(gallery);
-byId('landscape').querySelector('img').addEventListener('error', () => { byId('load-error').hidden = false; });
+new ResizeObserver(() => {
+  gallery.style.setProperty('--gallery-height', `${gallery.clientHeight}px`);
+  renderPan();
+}).observe(gallery);
+
+function loadPainting(retry = false) {
+  const request = ++paintingRequest;
+  paintingReady = false;
+  setAutomatic(false);
+  gallery.classList.add('is-loading');
+  gallery.setAttribute('aria-busy', 'true');
+  landscape.inert = true;
+  byId('painting-status').hidden = false;
+  byId('painting-message').textContent = '正在载入画卷…';
+  byId('start-explore').disabled = tourButton.disabled = panInput.disabled = true;
+  if (retry) {
+    painting.src = `${paintingSource}?retry=${Date.now()}`;
+    byId('story-image').src = painting.src;
+  }
+  renderPan();
+  painting.decode().then(() => {
+    if (request !== paintingRequest) return;
+    paintingReady = true;
+    gallery.classList.remove('is-loading');
+    gallery.setAttribute('aria-busy', 'false');
+    landscape.inert = false;
+    byId('painting-status').hidden = true;
+    byId('start-explore').disabled = tourButton.disabled = panInput.disabled = false;
+    document.documentElement.style.setProperty('--painting-image', `url("${painting.currentSrc}")`);
+    renderPan();
+  }).catch(() => {
+    if (request === paintingRequest) {
+      gallery.setAttribute('aria-busy', 'false');
+      byId('painting-message').textContent = '画卷暂未载入，请重新载入。';
+    }
+  });
+}
+byId('retry-painting').addEventListener('click', () => loadPainting(true));
 
 function resetNarration() {
   speechEpoch += 1;
@@ -271,13 +318,27 @@ function selectChapter(key) {
 function openStory(key = 'origin') {
   setAutomatic(false);
   selectChapter(key);
-  if (!dialog.open) dialog.showModal();
+  if (!dialog.open) {
+    if (!document.documentElement.classList.contains('story-open')) {
+      pageScroll = window.scrollY;
+      document.body.style.top = `${-pageScroll}px`;
+      document.documentElement.classList.add('story-open');
+    }
+    dialog.showModal();
+  }
 }
 reducedMotion.addEventListener('change', () => { setAutomatic(false); renderPan(); });
 byId('nav-story').addEventListener('click', () => openStory());
 byId('nav-listen').addEventListener('click', () => { openStory(); narrationButton.focus(); });
 byId('close-story').addEventListener('click', () => dialog.close());
-dialog.addEventListener('close', resetNarration);
+dialog.addEventListener('close', () => {
+  resetNarration();
+  // A quick reopen can precede the native close event.
+  if (dialog.open) return;
+  document.documentElement.classList.remove('story-open');
+  document.body.style.top = '';
+  window.scrollTo(0, pageScroll);
+});
 dialog.addEventListener('click', event => {
   const bounds = dialog.getBoundingClientRect();
   if (event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) dialog.close();
@@ -362,4 +423,4 @@ window.addEventListener('pagehide', () => {
   for (const recording of recordings.values()) URL.revokeObjectURL(recording.url);
   recordings.clear();
 });
-renderPan();
+loadPainting();

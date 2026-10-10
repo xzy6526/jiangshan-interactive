@@ -2,14 +2,14 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f3f0e7">
   <meta name="description" content="以千里江山图为灵感的原创青绿山水交互 Demo：漫游画卷，探索故事，聆听讲解。">
   <title>江山入画｜千里江山交互体验</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='3' y='3' width='58' height='58' rx='4' fill='%23a44132'/%3E%3Ctext x='32' y='46' text-anchor='middle' font-size='43' fill='%23f3f0e7'%3E山%3C/text%3E%3C/svg%3E">
-  <link rel="preload" as="image" href="./assets/qianli-landscape.png">
-  <link rel="stylesheet" href="./src/styles.css">
-  <script src="./src/app.js" defer></script>
+  <link rel="preload" as="image" href="./assets/qianli-landscape.jpg">
+  <link rel="stylesheet" href="./src/styles.css?v=0.3.0">
+  <script src="./src/app.js?v=0.3.0" defer></script>
 </head>
 <body>
   <!-- Phosphor Icons regular, MIT. Original license: assets/PHOSPHOR-LICENSE.txt. -->
@@ -35,9 +35,9 @@
     </nav>
   </header>
   <main id="main-content">
-    <section class="gallery" id="gallery" tabindex="0" aria-label="交互山水画卷。鼠标左右移动或触屏拖动；键盘左右方向键移动，Tab 键选择热点。">
-      <div class="landscape" id="landscape">
-        <img class="landscape-image" src="./assets/qianli-landscape.png" width="2172" height="724" alt="AI 原创青绿山水：层叠的石青山峰、开阔江水、亭台和小舟。以《千里江山图》为灵感，非原作。" draggable="false">
+    <section class="gallery is-loading" id="gallery" tabindex="0" aria-busy="true" aria-label="交互山水画卷。鼠标左右移动或触屏拖动；键盘左右方向键移动，Tab 键选择热点。">
+      <div class="landscape" id="landscape" inert>
+        <img class="landscape-image" src="./assets/qianli-landscape.jpg" width="2172" height="724" alt="AI 原创青绿山水：层叠的石青山峰、开阔江水、亭台和小舟。以《千里江山图》为灵感，非原作。" draggable="false" fetchpriority="high" decoding="async">
         <button class="hotspot" data-chapter="origin" style="--x:12%;--y:74%" aria-label="探索人间烟火，阅读画作身世">
           <span class="hotspot-dot"></span><span class="hotspot-label">人间烟火</span>
           <span class="hotspot-preview" aria-hidden="true"><span class="preview-image preview-life"></span><strong>山水间，自有人间</strong><span>走近这幅长卷的来处</span></span>
@@ -54,17 +54,17 @@
       <div class="hero-copy" id="hero-copy">
         <h1>千里江山<br><span>一卷入境</span></h1>
         <p>循青绿，入山河。<br class="mobile-break">让一幅画，成为一段旅程。</p>
-        <button class="primary-button" id="start-explore" type="button">开启画中游<svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
+        <button class="primary-button" id="start-explore" type="button" disabled>开启画中游<svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button>
       </div>
       <button class="return-title" id="return-title" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"/></svg>返回题签</button>
-      <div class="load-error" id="load-error" role="alert" hidden>画卷未能载入，请确认 assets 文件夹完整后刷新页面。</div>
+      <div class="painting-status" id="painting-status"><span id="painting-message" role="status">正在载入画卷…</span><button id="retry-painting" type="button">重新载入</button></div>
     </section>
     <section class="journey-bar" aria-label="画卷游览控制">
       <div class="journey-meta"><p>AI 原创山水 <span>·</span> 致意《千里江山图》</p><span class="position-label" id="position-label" aria-hidden="true">卷中位置 10%</span></div>
       <div class="journey-controls">
-        <button class="tour-toggle" id="tour-toggle" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span>自动游览</span></button>
-        <div class="minimap" id="minimap"><div class="minimap-window" id="minimap-window"></div><label class="sr-only" for="pan-position">画卷位置</label><input id="pan-position" type="range" min="0" max="100" step="0.1" value="10" aria-valuetext="画卷位置 10%"></div>
-        <div class="direction-controls"><button class="icon-button" id="pan-left" type="button" aria-label="向左游览"><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"/></svg></button><button class="icon-button" id="pan-right" type="button" aria-label="向右游览"><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button></div>
+        <button class="tour-toggle" id="tour-toggle" type="button" aria-pressed="false" disabled><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg><span>自动游览</span></button>
+        <div class="minimap" id="minimap"><div class="minimap-window" id="minimap-window"></div><label class="sr-only" for="pan-position">画卷位置</label><input id="pan-position" type="range" min="0" max="100" step="0.1" value="10" aria-valuetext="画卷位置 10%" disabled></div>
+        <div class="direction-controls"><button class="icon-button" id="pan-left" type="button" aria-label="向左游览" disabled><svg class="icon" aria-hidden="true"><use href="#i-arrow-left"/></svg></button><button class="icon-button" id="pan-right" type="button" aria-label="向右游览" disabled><svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></button></div>
       </div>
       <p class="interaction-hint"><span class="desktop-hint">左右移动，漫游山河</span><span class="touch-hint">左右拖动，漫游山河</span><i>·</i>点击光点，走近画中</p>
     </section>
@@ -74,11 +74,12 @@
     <div class="story-tabs" role="tablist" aria-label="画作介绍章节"><button id="tab-origin" role="tab" aria-selected="true" aria-controls="story-panel" data-tab="origin">画作身世</button><button id="tab-color" role="tab" aria-selected="false" aria-controls="story-panel" tabindex="-1" data-tab="color">青绿之色</button><button id="tab-fame" role="tab" aria-selected="false" aria-controls="story-panel" tabindex="-1" data-tab="fame">为何传世</button></div>
     <article class="story-body" id="story-panel" role="tabpanel" aria-labelledby="tab-origin" tabindex="0">
       <h3 id="story-title"></h3><p class="story-meta" id="story-meta"></p><p class="story-lead" id="story-lead"></p><div class="story-paragraphs" id="story-paragraphs"></div>
-      <figure class="story-figure"><img id="story-image" src="./assets/qianli-landscape.png" alt=""><figcaption>AI 原创山水局部 · 非原作图像</figcaption></figure>
+      <figure class="story-figure"><img id="story-image" src="./assets/qianli-landscape.jpg" alt=""><figcaption>AI 原创山水局部 · 非原作图像</figcaption></figure>
+      <a class="source-link" href="https://www.dpm.org.cn/collection/paint/228354.html" target="_blank" rel="noopener noreferrer">资料来源：故宫博物院<svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></a>
     </article>
     <div class="narration-area">
       <div class="narration-box"><div class="narration-row"><button class="narration-play" id="narration-toggle" type="button" aria-label="播放本节讲解"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg></button><div class="narration-label"><strong>本节讲解</strong><span id="audio-status" role="status">系统试读 · 可导入真人音频</span></div><button class="upload-button" id="import-audio" type="button"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>导入录音</button><input id="audio-file" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac" hidden></div><div class="audio-seek" id="audio-seek" hidden><label class="sr-only" for="audio-position">真人讲解播放进度</label><input id="audio-position" type="range" min="0" max="100" step="0.1" value="0"><span id="audio-time">0:00 / 0:00</span></div></div>
-      <p class="audio-note">录音仅在本机使用，刷新页面后需重新导入。</p><a class="source-link" href="https://www.dpm.org.cn/collection/paint/228354.html" target="_blank" rel="noopener noreferrer">资料来源：故宫博物院<svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg></a>
+      <p class="audio-note">录音仅在本机使用，刷新页面后需重新导入。</p>
     </div>
     <audio id="recorded-audio" preload="metadata"></audio>
   </dialog>
